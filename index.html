@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#5b3a29">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<title>Lil Tira Billing</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font:16px system-ui,sans-serif;background:#fbf6f0;color:#3b2417;padding-bottom:72px}
+header{background:#5b3a29;color:#fff;padding:14px 16px}
+header h1{margin:0;font-size:18px}header small{opacity:.85}
+.tabs{position:fixed;bottom:0;left:0;right:0;display:flex;background:#fff;border-top:1px solid #e3d5c8}
+.tabs button{flex:1;padding:14px;border:0;background:none;font-size:15px;color:#7a5a47}
+.tabs button.on{color:#5b3a29;font-weight:700;border-top:3px solid #5b3a29}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px}
+.item{position:relative;padding:14px 8px;border:1px solid #e3d5c8;border-radius:12px;background:#fff;font-size:15px;color:inherit}
+.item span{display:block;color:#8a6a55;margin-top:4px}
+.item i{position:absolute;top:6px;right:8px;background:#5b3a29;color:#fff;border-radius:10px;padding:1px 8px;font-style:normal;font-size:13px}
+.card{margin:0 12px 12px;padding:12px;background:#fff;border:1px solid #e3d5c8;border-radius:12px}
+.row{display:flex;align-items:center;gap:8px;margin:6px 0}
+.g{flex:1}
+.q button{width:36px;height:36px;border-radius:18px;border:1px solid #cdb9a8;background:#fff;font-size:18px}
+.big{width:100%;padding:14px;border:0;border-radius:12px;background:#5b3a29;color:#fff;font-size:17px;margin-top:8px}
+input{width:100%;padding:10px;border:1px solid #cdb9a8;border-radius:8px;font-size:16px}
+pre{background:#fff8ef;padding:12px;border-radius:8px;font:14px ui-monospace,monospace;overflow-x:auto;margin:0}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;padding:16px}
+.modal.on{display:flex}
+.modal .card{margin:0;width:100%;max-width:420px;max-height:90vh;overflow:auto}
+.hide{display:none}
+</style></head><body>
+<header><h1 id="st"></h1><small id="tt"></small></header>
+<main>
+<section id="sell"><div class="grid" id="grid"></div><div class="card" id="cartc"></div></section>
+<section id="bills" class="hide"></section>
+<section id="menu" class="hide"></section>
+</main>
+<nav class="tabs"><button class="on" data-t="sell">Sell</button><button data-t="bills">Bills</button><button data-t="menu">Menu</button></nav>
+<div class="modal" id="md"><div class="card"><pre id="bt"></pre>
+<button class="big" id="sh">Share</button>
+<button class="big" id="cp" style="background:#8a6a55">Copy</button>
+<button class="big" id="cl" style="background:#ccc;color:#333">Close</button></div></div>
+<script>
+const K='tira_v1';
+let S=null;
+try{S=JSON.parse(localStorage.getItem(K))}catch(e){}
+S=S||{store:'Lil Tira Cake Shop',next:1,bills:[],menu:[
+{n:'Classic Tiramisu cup',p:120},{n:'Coffee Tiramisu jar',p:180},{n:'Mini Tiramisu',p:60},
+{n:'Chocolate cake slice',p:90},{n:'Cupcake',p:50},{n:'Tiramisu cake 500g',p:650}]};
+let cart={},phone='',cur='';
+const $=id=>document.getElementById(id);
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const isToday=b=>new Date(b.t).toDateString()===new Date().toDateString();
+const sum=a=>a.reduce((x,b)=>x+b.total,0);
+
+function tab(t){
+ ['sell','bills','menu'].forEach(x=>$(x).classList.toggle('hide',x!==t));
+ document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+ if(t==='bills')rBills();if(t==='menu')rMenu();
+}
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>tab(b.dataset.t));
+
+function head(){
+ const td=S.bills.filter(isToday);
+ $('st').textContent=S.store;
+ $('tt').textContent='Today: '+td.length+' bills, Rs '+sum(td);
+}
+function rSell(){
+ $('grid').innerHTML=S.menu.map((m,i)=>`<button class="item" onclick="add(${i})">${esc(m.n)}<span>Rs ${m.p}</span>${cart[i]?`<i>${cart[i]}</i>`:''}</button>`).join('');
+ const ks=Object.keys(cart);let tot=0;
+ const rows=ks.map(k=>{const m=S.menu[k],q=cart[k];tot+=m.p*q;
+  return `<div class="row"><div class="g">${esc(m.n)}<br><small>Rs ${m.p} x ${q} = Rs ${m.p*q}</small></div><div class="q"><button onclick="chg(${k},-1)">-</button> <button onclick="chg(${k},1)">+</button></div></div>`}).join('');
+ $('cartc').innerHTML=ks.length?rows+`<h3>Total: Rs ${tot}</h3><input type="tel" placeholder="Customer phone (optional)" value="${esc(phone)}" oninput="phone=this.value"><button class="big" onclick="mk()">Make bill</button>`:'<small>Tap items above to add them.</small>';
+}
+function add(i){cart[i]=(cart[i]||0)+1;rSell();}
+function chg(k,d){cart[k]+=d;if(cart[k]<=0)delete cart[k];rSell();}
+function mk(){
+ const items=Object.keys(cart).map(k=>[S.menu[k].n,cart[k],S.menu[k].p]);
+ const total=items.reduce((a,x)=>a+x[1]*x[2],0);
+ const b={no:S.next++,t:Date.now(),phone:phone.trim(),items,total};
+ S.bills.unshift(b);S.bills=S.bills.slice(0,2000);save();
+ cart={};phone='';rSell();head();show(b);
+}
+function bt(b){
+ const w=28,L='-'.repeat(w),E='='.repeat(w);
+ const c=s=>' '.repeat(Math.max(0,Math.floor((w-s.length)/2)))+s;
+ const o=[E,c(S.store),E,'Bill #'+b.no,new Date(b.t).toLocaleString('en-IN'),L];
+ b.items.forEach(x=>{o.push(x[0]);o.push('   '+x[1]+' x Rs '+x[2]+' = Rs '+x[1]*x[2]);});
+ const t='TOTAL: Rs '+b.total;
+ o.push(L,' '.repeat(Math.max(0,w-t.length))+t,E,c('Thank you! Visit again'));
+ return o.join('\n');
+}
+function show(b){cur=bt(b);$('bt').textContent=cur;$('md').classList.add('on');}
+$('cl').onclick=()=>$('md').classList.remove('on');
+$('sh').onclick=()=>{if(navigator.share)navigator.share({text:cur}).catch(()=>{});else $('cp').click();};
+$('cp').onclick=()=>{try{navigator.clipboard.writeText(cur);alert('Copied')}catch(e){alert('Copy not available')}};
+
+function rBills(){
+ const td=S.bills.filter(isToday);
+ $('bills').innerHTML=`<div class="card"><b>Today: ${td.length} bills, Rs ${sum(td)}</b></div>`+
+ S.bills.slice(0,100).map((b,i)=>`<div class="card" onclick="show(S.bills[${i}])">#${b.no} &middot; ${new Date(b.t).toLocaleString('en-IN')}<br>Rs ${b.total}${b.phone?' &middot; '+esc(b.phone):''}</div>`).join('');
+}
+function rMenu(){
+ $('menu').innerHTML=`<div class="card"><label>Store name</label><input value="${esc(S.store)}" onchange="S.store=this.value;save();head()"></div><div class="card">`+
+ S.menu.map((m,i)=>`<div class="row"><input class="g" value="${esc(m.n)}" onchange="ed(${i},'n',this.value)"><input style="width:84px" type="number" value="${m.p}" onchange="ed(${i},'p',this.value)"><button onclick="del(${i})">&times;</button></div>`).join('')+
+ `<button class="big" onclick="addm()">+ Add item</button></div>`;
+}
+function ed(i,k,v){if(k==='p')v=Math.max(0,Number(v)||0);S.menu[i][k]=v;cart={};save();rSell();}
+function del(i){S.menu.splice(i,1);cart={};save();rMenu();rSell();}
+function addm(){S.menu.push({n:'New item',p:0});cart={};save();rMenu();rSell();}
+
+head();rSell();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script></body></html>
